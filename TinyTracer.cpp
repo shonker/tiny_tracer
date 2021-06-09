@@ -9,6 +9,7 @@
 * -o    <output_path> Output file
 *
 */
+
 #include "pin.H"
 
 #include <iostream>
@@ -18,9 +19,10 @@
 #include "ProcessInfo.h"
 #include "TraceLog.h"
 #include "FuncWatch.h"
+#include "ScanProcess.h"
 
 #define TOOL_NAME "TinyTracer"
-#define VERSION "1.6"
+#define VERSION "1.6.1"
 
 #include "Util.h"
 #include "Settings.h"
@@ -393,6 +395,51 @@ VOID MonitorFunctionArgs(IMG Image, const WFuncInfo &funcInfo)
     RTN_Close(funcRtn);
 }
 
+VOID _WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
+{
+    int pid = getPid(threadId);
+    std::stringstream ss;
+    ss << "Thread via: ";
+    ss << name;
+    ss << " threadID: " << threadId;
+    ss << " PID: " << pid << "\n";
+    traceLog.logLine(ss.str());
+    ss.clear();
+
+    bool isDetected = ScanProcess(pid);
+
+    ss << "Detected by PE-sieve: ";
+    ss << " PID: " << pid << "\n";
+    traceLog.logLine(ss.str());
+}
+
+VOID WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
+{
+    PIN_LockClient();
+    _WatchResumeThread(Address, name, threadId);
+    PIN_UnlockClient();
+}
+
+VOID MonitorThreads(IMG Image)
+{
+    CHAR* fName = "NtResumeThread";
+    RTN funcRtn = RTN_FindByName(Image, fName);
+    if (!RTN_Valid(funcRtn)) return; // failed
+
+    RTN_Open(funcRtn);
+
+    RTN_InsertCall(funcRtn,
+        IPOINT_BEFORE,
+        AFUNPTR(WatchResumeThread),
+        IARG_RETURN_IP,
+        IARG_ADDRINT, fName,
+        IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+        IARG_END
+    );
+
+    RTN_Close(funcRtn);
+}
+
 
 /* ===================================================================== */
 // Instrumentation callbacks
@@ -450,13 +497,27 @@ VOID ImageLoad(IMG Image, VOID *v)
 {
     PIN_LockClient();
     pInfo.addModule(Image);
+    const std::string dllName = util::getDllName(IMG_Name(Image));
     for (size_t i = 0; i < g_Watch.funcs.size(); i++) {
-        const std::string dllName = util::getDllName(IMG_Name(Image));
         if (util::iequals(dllName, g_Watch.funcs[i].dllName)) {
             MonitorFunctionArgs(Image, g_Watch.funcs[i]);
         }
     }
+    MonitorThreads(Image);
     PIN_UnlockClient();
+}
+
+BOOL FollowChildCallback(CHILD_PROCESS childProcess, VOID *val)
+{
+    //PIN_LockClient();
+    OS_PROCESS_ID pid = CHILD_PROCESS_GetId(childProcess);
+
+    std::stringstream ss;
+    ss << "Child PID: " << std::dec << pid;
+    traceLog.logLine(ss.str());
+
+    //PIN_UnlockClient();
+    return TRUE;
 }
 
 static void OnCtxChange(THREADID threadIndex,
@@ -532,6 +593,8 @@ int main(int argc, char *argv[])
 
     // Register context changes
     PIN_AddContextChangeFunction(OnCtxChange, NULL);
+
+    PIN_AddFollowChildProcessFunction(FollowChildCallback, NULL);
 
     std::cerr << "===============================================" << std::endl;
     std::cerr << "This application is instrumented by " << TOOL_NAME << " v." << VERSION << std::endl;
