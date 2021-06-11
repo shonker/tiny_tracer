@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 
-int getPid(void* hndl);
+int getPidByThreadHndl(void* hndl);
+int getPidByProcessHndl(void *hndl);
 
 bool ScanProcess(int pid);

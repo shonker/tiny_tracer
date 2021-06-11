@@ -9,10 +9,17 @@
 #define PE_SIEVE "pe-sieve32.dll"
 #endif
 
-int getPid(void* hndl)
+int getPidByThreadHndl(void* hndl)
 {
     HANDLE phndl = (HANDLE) hndl;
     DWORD pid = GetProcessIdOfThread(phndl);
+    return pid;
+}
+
+int getPidByProcessHndl(void *hndl)
+{
+    HANDLE phndl = (HANDLE)hndl;
+    DWORD pid = GetProcessId(phndl);
     return pid;
 }
 

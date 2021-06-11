@@ -301,7 +301,7 @@ bool isWatchedAddress(const ADDRINT Address)
     }
     return false;
 }
-
+/*
 std::wstring paramToStr(VOID *arg1)
 {
     if (arg1 == NULL) {
@@ -394,10 +394,21 @@ VOID MonitorFunctionArgs(IMG Image, const WFuncInfo &funcInfo)
 
     RTN_Close(funcRtn);
 }
+*/
+
+bool RunPEsieveScan(int pid)
+{
+    bool isDetected = ScanProcess(pid);
+    std::stringstream ss;
+    ss << "Detected by PE-sieve: ";
+    ss << " PID: " << pid << "\n";
+    traceLog.logLine(ss.str());
+    return isDetected;
+}
 
 VOID _WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
 {
-    int pid = getPid(threadId);
+    int pid = getPidByThreadHndl(threadId);
     std::stringstream ss;
     ss << "Thread via: ";
     ss << name;
@@ -406,11 +417,7 @@ VOID _WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
     traceLog.logLine(ss.str());
     ss.clear();
 
-    bool isDetected = ScanProcess(pid);
-
-    ss << "Detected by PE-sieve: ";
-    ss << " PID: " << pid << "\n";
-    traceLog.logLine(ss.str());
+    RunPEsieveScan(pid);
 }
 
 VOID WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
@@ -420,9 +427,8 @@ VOID WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
     PIN_UnlockClient();
 }
 
-VOID MonitorThreads(IMG Image)
+VOID MonitorResumeThread(IMG Image, CHAR* fName, int procHndlArgNum)
 {
-    CHAR* fName = "NtResumeThread";
     RTN funcRtn = RTN_FindByName(Image, fName);
     if (!RTN_Valid(funcRtn)) return; // failed
 
@@ -433,11 +439,59 @@ VOID MonitorThreads(IMG Image)
         AFUNPTR(WatchResumeThread),
         IARG_RETURN_IP,
         IARG_ADDRINT, fName,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+        IARG_FUNCARG_ENTRYPOINT_VALUE, procHndlArgNum, //ThreadHandle
         IARG_END
     );
 
     RTN_Close(funcRtn);
+}
+//---
+
+VOID _WatchCreateThread(const ADDRINT Address, CHAR *name, VOID* processHndl)
+{
+    int pid = getPidByProcessHndl(processHndl);
+    std::stringstream ss;
+    ss << "Thread via: ";
+    ss << name;
+    ss << " PID: " << pid << "\n";
+    traceLog.logLine(ss.str());
+    ss.clear();
+
+    RunPEsieveScan(pid);
+}
+
+VOID WatchCreateThread(const ADDRINT Address, CHAR *name, VOID* threadId)
+{
+    PIN_LockClient();
+    _WatchCreateThread(Address, name, threadId);
+    PIN_UnlockClient();
+}
+
+VOID MonitorCreateThread(IMG Image, CHAR* fName, int procHndlArgNum)
+{
+    RTN funcRtn = RTN_FindByName(Image, fName);
+    if (!RTN_Valid(funcRtn)) return; // failed
+
+    RTN_Open(funcRtn);
+
+    RTN_InsertCall(funcRtn,
+        IPOINT_BEFORE,
+        AFUNPTR(WatchCreateThread),
+        IARG_RETURN_IP,
+        IARG_ADDRINT, fName,
+        IARG_FUNCARG_ENTRYPOINT_VALUE, procHndlArgNum, //ProcessHandle
+        IARG_END
+    );
+
+    RTN_Close(funcRtn);
+}
+
+
+VOID MonitorThreads(IMG Image)
+{
+    MonitorResumeThread(Image, "NtResumeThread", 0);
+    MonitorCreateThread(Image, "NtCreateThreadEx", 3);
+    MonitorCreateThread(Image, "NtCreateThread", 3);
 }
 
 
@@ -497,15 +551,10 @@ VOID ImageLoad(IMG Image, VOID *v)
 {
     PIN_LockClient();
     pInfo.addModule(Image);
-    const std::string dllName = util::getDllName(IMG_Name(Image));
-    for (size_t i = 0; i < g_Watch.funcs.size(); i++) {
-        if (util::iequals(dllName, g_Watch.funcs[i].dllName)) {
-            MonitorFunctionArgs(Image, g_Watch.funcs[i]);
-        }
-    }
     MonitorThreads(Image);
     PIN_UnlockClient();
 }
+
 
 BOOL FollowChildCallback(CHILD_PROCESS childProcess, VOID *val)
 {
@@ -519,6 +568,8 @@ BOOL FollowChildCallback(CHILD_PROCESS childProcess, VOID *val)
     //PIN_UnlockClient();
     return TRUE;
 }
+
+//-----
 
 static void OnCtxChange(THREADID threadIndex,
     CONTEXT_CHANGE_REASON reason,
