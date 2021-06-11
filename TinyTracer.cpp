@@ -93,12 +93,23 @@ bool isStrEqualI(const std::string &str1, const std::string &str2)
 
 bool RunPEsieveScan(int pid)
 {
-    bool isDetected = ScanProcess(pid);
+    char out_dir[] = "C:\\scans\\";
+    scan_res res = ScanProcess(pid, out_dir);
     std::stringstream ss;
-    ss << "Detected by PE-sieve: ";
-    ss << " PID: " << pid << "\n";
+    ss << "Scanned by PE-sieve: ";
+    ss << " PID: " << pid << " ";
+    ss << "Status: ";
+    if (res == SCAN_SUSPICIOUS) {
+        ss << "suspicious";
+    }
+    else if (res == SCAN_NOT_SUSPICIOUS) {
+        ss << " NOT_suspicious";
+    }
+    else {
+        ss << " scan failed: " << std::dec << res;
+    }
     traceLog.logLine(ss.str());
-    return isDetected;
+    return (res == SCAN_SUSPICIOUS) ? true : false;
 }
 
 
@@ -135,6 +146,8 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo)
             const ADDRINT pageTo = query_region_base(addrTo);
             m_tracedShellc.insert(pageTo); //save the beginning of this area
             traceLog.logCall(0, RvaFrom, pageTo, addrTo);
+            // scan current process:
+            RunPEsieveScan(PIN_GetPid());
         }
     }
     // trace calls from witin a shellcode:
@@ -167,6 +180,8 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo)
                         ADDRINT base = get_base(addrFrom);
                         ADDRINT RvaFrom = addrFrom - base;
                         traceLog.logCall(base, RvaFrom, pageTo, addrTo);
+                        // scan current process:
+                        RunPEsieveScan(PIN_GetPid());
                     }
                 }
             }

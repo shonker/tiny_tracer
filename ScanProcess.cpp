@@ -23,24 +23,31 @@ int getPidByProcessHndl(void *hndl)
     return pid;
 }
 
-bool ScanProcess(int pid)
+scan_res ScanProcess(int pid, char out_dir[])
 {
-    HMODULE process = LoadLibraryA(PE_SIEVE);
+    std::string pesieve_path = std::string(PESIEVE_DIR) + "\\" + PE_SIEVE;
 
+    HMODULE pesieve = LoadLibraryA(pesieve_path.c_str());
+    if (!pesieve) {
+        return SCAN_ERROR_0;
+    }
     PEsieve_params args = { 0 };
     args.pid = pid;
     args.quiet = true;
     args.shellcode = true;
-    char out_dir[] = "C:\\scans\\";
+    args.no_hooks = false;
+    args.json_lvl = pesieve::JSON_DETAILS;
+    args.imprec_mode = pesieve::PE_IMPREC_AUTO;
     memcpy(args.output_dir, out_dir, strlen(out_dir));
 
     PEsieve_report(__cdecl *scan)(const PEsieve_params args) = 
-        (PEsieve_report(__cdecl *)(const PEsieve_params args))GetProcAddress(process, "PESieve_scan");
-    if (!scan) return false;
-
+        (PEsieve_report(__cdecl *)(const PEsieve_params args))GetProcAddress(pesieve, "PESieve_scan");
+    if (!scan) {
+        return SCAN_ERROR_1;
+    }
     PEsieve_report report = scan(args);
     if (report.suspicious) {
-        return true;
+        return SCAN_SUSPICIOUS;
     }
-    return false;
+    return SCAN_NOT_SUSPICIOUS;
 }
