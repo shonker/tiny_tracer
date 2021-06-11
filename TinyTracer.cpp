@@ -87,6 +87,22 @@ bool isStrEqualI(const std::string &str1, const std::string &str2)
 }
 
 /* ===================================================================== */
+// PE-sieve deployment
+/* ===================================================================== */
+
+
+bool RunPEsieveScan(int pid)
+{
+    bool isDetected = ScanProcess(pid);
+    std::stringstream ss;
+    ss << "Detected by PE-sieve: ";
+    ss << " PID: " << pid << "\n";
+    traceLog.logLine(ss.str());
+    return isDetected;
+}
+
+
+/* ===================================================================== */
 // Analysis routines
 /* ===================================================================== */
 
@@ -301,112 +317,9 @@ bool isWatchedAddress(const ADDRINT Address)
     }
     return false;
 }
-/*
-std::wstring paramToStr(VOID *arg1)
-{
-    if (arg1 == NULL) {
-        return L"0";
-    }
-    const size_t kMaxStr = 300;
-    const BOOL isReadableAddr = PIN_CheckReadAccess(arg1);
-    std::wstringstream ss;
 
-    if (!isReadableAddr) {
-        // single value
-        ss << std::hex << (arg1);
-        return ss.str();
-    }
-    bool isSet = false;
-    const char* val = (char*)arg1;
-    size_t len = util::getAsciiLen(val, kMaxStr);
 
-    if (len == 1) { // Possible wideString
-        wchar_t* val = (wchar_t*)arg1;
-        size_t wLen = util::getAsciiLenW(val, kMaxStr);
-        if (wLen >= len) {
-            ss << "L\"" << val << "\"";
-            isSet = true;
-        }
-    }
-    else if (len > 1) { // ASCII string
-        ss << "\"" << val << "\"";
-        isSet = true;
-    }
-
-    if (!isSet) { // none of the above, possible pointer to some structure
-        ss << "ptr " << std::hex << (arg1);
-    }
-    return ss.str();
-}
-
-VOID _LogFunctionArgs(const ADDRINT Address, CHAR *name, uint32_t argCount, VOID *arg1, VOID *arg2, VOID *arg3, VOID *arg4, VOID *arg5, VOID *arg6, VOID *arg7, VOID *arg8, VOID *arg9, VOID *arg10)
-{
-    if (!isWatchedAddress(Address)) return;
-
-    const size_t argsMax = 10;
-    VOID* args[argsMax] = { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10 };
-    std::wstringstream ss;
-    for (size_t i = 0; i < argCount && i < argsMax; i++) {
-        ss << "\tArg[" << i << "] = ";
-        ss << paramToStr(args[i]);
-        ss << "\n";
-    }
-
-    std::wstring argsLineW = ss.str();
-    std::string s(argsLineW.begin(), argsLineW.end());
-    traceLog.logLine(s);
-}
-
-VOID LogFunctionArgs(const ADDRINT Address, CHAR *name, uint32_t argCount, VOID *arg1, VOID *arg2, VOID *arg3, VOID *arg4, VOID *arg5, VOID *arg6, VOID *arg7, VOID *arg8, VOID *arg9, VOID *arg10)
-{
-    PIN_LockClient();
-    _LogFunctionArgs(Address, name, argCount, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
-    PIN_UnlockClient();
-}
-
-VOID MonitorFunctionArgs(IMG Image, const WFuncInfo &funcInfo)
-{
-    const CHAR* fName = funcInfo.funcName.c_str();
-    size_t argNum = funcInfo.paramCount;
-    RTN funcRtn = RTN_FindByName(Image, fName);
-    if (!RTN_Valid(funcRtn) || !funcInfo.isValid()) return; // failed
-
-    std::cout << "Watch " << IMG_Name(Image) << ": " << fName << " [" << argNum << "]\n";
-    RTN_Open(funcRtn);
-
-    RTN_InsertCall(funcRtn, IPOINT_BEFORE, AFUNPTR(LogFunctionArgs),
-        IARG_RETURN_IP,
-        IARG_ADDRINT, fName,
-        IARG_UINT32, argNum,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 2,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 3,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 4,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 5,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 6,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 7,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 8,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 9,
-        IARG_FUNCARG_ENTRYPOINT_VALUE, 10,
-        IARG_END
-    );
-
-    RTN_Close(funcRtn);
-}
-*/
-
-bool RunPEsieveScan(int pid)
-{
-    bool isDetected = ScanProcess(pid);
-    std::stringstream ss;
-    ss << "Detected by PE-sieve: ";
-    ss << " PID: " << pid << "\n";
-    traceLog.logLine(ss.str());
-    return isDetected;
-}
-
-VOID _WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
+VOID _WatchExistingThread(const ADDRINT Address, CHAR *name, VOID* threadId)
 {
     int pid = getPidByThreadHndl(threadId);
     std::stringstream ss;
@@ -420,14 +333,14 @@ VOID _WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
     RunPEsieveScan(pid);
 }
 
-VOID WatchResumeThread(const ADDRINT Address, CHAR *name, VOID* threadId)
+VOID WatchExistingThread(const ADDRINT Address, CHAR *name, VOID* threadId)
 {
     PIN_LockClient();
-    _WatchResumeThread(Address, name, threadId);
+    _WatchExistingThread(Address, name, threadId);
     PIN_UnlockClient();
 }
 
-VOID MonitorResumeThread(IMG Image, CHAR* fName, int procHndlArgNum)
+VOID MonitorExistingThread(IMG Image, CHAR* fName, int procHndlArgNum)
 {
     RTN funcRtn = RTN_FindByName(Image, fName);
     if (!RTN_Valid(funcRtn)) return; // failed
@@ -436,7 +349,7 @@ VOID MonitorResumeThread(IMG Image, CHAR* fName, int procHndlArgNum)
 
     RTN_InsertCall(funcRtn,
         IPOINT_BEFORE,
-        AFUNPTR(WatchResumeThread),
+        AFUNPTR(WatchExistingThread),
         IARG_RETURN_IP,
         IARG_ADDRINT, fName,
         IARG_FUNCARG_ENTRYPOINT_VALUE, procHndlArgNum, //ThreadHandle
@@ -486,14 +399,13 @@ VOID MonitorCreateThread(IMG Image, CHAR* fName, int procHndlArgNum)
     RTN_Close(funcRtn);
 }
 
-
 VOID MonitorThreads(IMG Image)
 {
-    MonitorResumeThread(Image, "NtResumeThread", 0);
+    MonitorExistingThread(Image, "NtResumeThread", 0);
+    MonitorExistingThread(Image, "NtQueueApcThread", 0);
     MonitorCreateThread(Image, "NtCreateThreadEx", 3);
     MonitorCreateThread(Image, "NtCreateThread", 3);
 }
-
 
 /* ===================================================================== */
 // Instrumentation callbacks
@@ -553,20 +465,6 @@ VOID ImageLoad(IMG Image, VOID *v)
     pInfo.addModule(Image);
     MonitorThreads(Image);
     PIN_UnlockClient();
-}
-
-
-BOOL FollowChildCallback(CHILD_PROCESS childProcess, VOID *val)
-{
-    //PIN_LockClient();
-    OS_PROCESS_ID pid = CHILD_PROCESS_GetId(childProcess);
-
-    std::stringstream ss;
-    ss << "Child PID: " << std::dec << pid;
-    traceLog.logLine(ss.str());
-
-    //PIN_UnlockClient();
-    return TRUE;
 }
 
 //-----
@@ -644,9 +542,7 @@ int main(int argc, char *argv[])
 
     // Register context changes
     PIN_AddContextChangeFunction(OnCtxChange, NULL);
-
-    PIN_AddFollowChildProcessFunction(FollowChildCallback, NULL);
-
+    
     std::cerr << "===============================================" << std::endl;
     std::cerr << "This application is instrumented by " << TOOL_NAME << " v." << VERSION << std::endl;
     std::cerr << "Tracing module: " << app_name << std::endl;
