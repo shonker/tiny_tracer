@@ -418,8 +418,12 @@ VOID MonitorThreads(IMG Image)
 {
     MonitorExistingThread(Image, "NtResumeThread", 0);
     MonitorExistingThread(Image, "NtQueueApcThread", 0);
+    MonitorExistingThread(Image, "NtQueueApcThreadEx", 0);
+    MonitorExistingThread(Image, "NtAlertResumeThread", 0);
+
     MonitorCreateThread(Image, "NtCreateThreadEx", 3);
     MonitorCreateThread(Image, "NtCreateThread", 3);
+    MonitorCreateThread(Image, "RtlCreateUserThread", 0);
 }
 
 /* ===================================================================== */
