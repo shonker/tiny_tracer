@@ -87,8 +87,15 @@ ADDRINT addr_to_rva(ADDRINT Address)
 
 ADDRINT query_region_base(ADDRINT memoryAddr)
 {
-    if (memoryAddr == UNKNOWN_ADDR) {
+    NATIVE_PID processId = (NATIVE_PID)PIN_GetPid();
+    OS_MEMORY_AT_ADDR_INFORMATION  info = { 0 };
+    OS_RETURN_CODE ret = OS_QueryMemory(processId,
+        (VOID*)memoryAddr,
+        &info
+    );
+    const ADDRINT baseAddr = (ADDRINT)info.BaseAddress;
+    if (ret.generic_err != OS_RETURN_CODE_NO_ERROR) {
         return UNKNOWN_ADDR;
     }
-    return GetPageOfAddr((ADDRINT)memoryAddr);
+    return baseAddr;
 }
