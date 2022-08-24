@@ -8,7 +8,31 @@
 #include <map>
 #include <vector>
 
-struct WFuncInfo 
+
+struct FuncInfo
+{
+    FuncInfo()
+    {
+    }
+
+    FuncInfo(const FuncInfo& a)
+    {
+        this->dllName = a.dllName;
+        this->funcName = a.funcName;
+    }
+
+    virtual bool load(const std::string& line, char delimiter);
+
+    bool isValid() const
+    {
+        return dllName.length() > 0 && funcName.length() > 0;
+    }
+
+    std::string dllName;
+    std::string funcName;
+};
+
+struct WFuncInfo : public FuncInfo
 {
     WFuncInfo() : paramCount(0)
     {
@@ -21,17 +45,10 @@ struct WFuncInfo
         this->paramCount = a.paramCount;
     }
 
-    bool load(const std::string &line, char delimiter);
+    virtual bool load(const std::string &line, char delimiter);
 
     bool update(const WFuncInfo &func_info);
 
-    bool isValid() const
-    {
-        return dllName.length() > 0 && funcName.length() > 0;
-    }
-
-    std::string dllName;
-    std::string funcName;
     size_t paramCount;
 };
 
@@ -71,3 +88,28 @@ private:
     WFuncInfo* findFunc(const std::string& dllName, const std::string& funcName);
 };
 
+//---
+
+class FuncExcludeList {
+public:
+    FuncExcludeList()
+    {
+    }
+
+    ~FuncExcludeList()
+    {
+    }
+
+    bool isEmpty() { return this->funcs.size() > 0 ? false : true; }
+
+    bool contains(const std::string& dll_name, const std::string& func);
+
+    size_t loadList(const char* filename);
+
+    std::vector<FuncInfo> funcs;
+
+private:
+    bool appendFunc(FuncInfo& info);
+
+    FuncInfo* findFunc(const std::string& dllName, const std::string& funcName);
+};

@@ -34,6 +34,7 @@ ProcessInfo pInfo;
 TraceLog traceLog;
 
 FuncWatchList g_Watch;
+FuncExcludeList g_Excluded;
 
 // last shellcode to which the transition got redirected:
 std::set<ADDRINT> m_tracedShellc;
@@ -52,6 +53,9 @@ KNOB<std::string> KnobModuleName(KNOB_MODE_WRITEONCE, "pintool",
 
 KNOB<std::string> KnobWatchListFile(KNOB_MODE_WRITEONCE, "pintool",
     "b", "", "A list of watched functions (dump parameters before the execution)");
+
+KNOB<std::string> KnobExcludedListFile(KNOB_MODE_WRITEONCE, "pintool",
+    "x", "", "A list of functions excluded from watching");
 
 /* ===================================================================== */
 // Utilities
@@ -179,6 +183,18 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo, BOOL isIndir
     const bool isCallerPeModule = IMG_Valid(callerModule);
     const bool isTargetPeModule = IMG_Valid(targetModule);
 
+
+    const std::string func = get_func_at(addrTo);
+
+    if (!g_Excluded.isEmpty()) {
+        // check if the current function is excluded:
+
+        if (g_Excluded.contains("", func)) {
+            // this function is excluded from the monitoring
+            return;
+        }
+    }
+
     /**
     is it a transition from the traced module to a foreign module?
     */
@@ -187,7 +203,6 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo, BOOL isIndir
     {
         ADDRINT RvaFrom = addr_to_rva(addrFrom);
         if (isTargetPeModule) {
-            const std::string func = get_func_at(addrTo);
             const std::string dll_name = IMG_Name(targetModule);
             traceLog.logCall(0, RvaFrom, true, dll_name, func);
         }
@@ -208,9 +223,7 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo, BOOL isIndir
         const ADDRINT pageTo = query_region_base(addrTo);
 
         if (isTargetPeModule) { // it is a call to a module
-            const std::string func = get_func_at(addrTo);
             const std::string dll_name = IMG_Name(targetModule);
-
             traceLog.logCall(pageFrom, addrFrom, false, dll_name, func);
         }
         else if (pageFrom != pageTo) // it is a call to another shellcode
@@ -243,12 +256,10 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo, BOOL isIndir
         const ADDRINT returnAddr = getReturnFromTheStack(ctx);
         const WatchedType toWType = isWatchedAddress(returnAddr); // does it return into the traced area?
         if (toWType != WatchedType::NOT_WATCHED) {
-            const std::string func = get_func_at(addrTo);
-            const std::string dll_name = IMG_Name(targetModule);
             const ADDRINT pageRet = get_base(returnAddr);
             const ADDRINT RvaFrom = addr_to_rva(addrFrom);
             const ADDRINT base = isTargetMy ? 0 : get_base(addrFrom);
-
+            const std::string dll_name = IMG_Name(targetModule);
             traceLog.logCallRet(base, RvaFrom, pageRet, returnAddr, dll_name, func);
         }
     }
@@ -667,7 +678,6 @@ VOID ImageLoad(IMG Image, VOID *v)
         if (util::iequals(dllName, g_Watch.funcs[i].dllName)) {
             MonitorFunctionArgs(Image, g_Watch.funcs[i]);
         }
-
     }
     if (m_Settings.hookSleep) {
         const std::string dllName = util::getDllName(IMG_Name(Image));
@@ -740,6 +750,13 @@ int main(int argc, char *argv[])
         m_Settings.saveINI(iniFilename);
     }
 
+    if (KnobExcludedListFile.Enabled()) {
+        std::string excludedList = KnobExcludedListFile.ValueString();
+        if (excludedList.length()) {
+            g_Excluded.loadList(excludedList.c_str());
+            std::cout << "Excluded " << g_Excluded.funcs.size() << " functions\n";
+        }
+    }
     if (KnobWatchListFile.Enabled()) {
         std::string watchListFile = KnobWatchListFile.ValueString();
         if (watchListFile.length()) {

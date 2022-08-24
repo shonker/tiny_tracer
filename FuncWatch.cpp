@@ -6,6 +6,21 @@
 
 #include "Util.h"
 
+
+bool FuncInfo::load(const std::string& sline, char delimiter)
+{
+    std::vector<std::string> args;
+    util::splitList(sline, delimiter, args);
+    if (args.size() < 2) return false;
+
+    this->dllName = args[0];
+    this->funcName = args[1];
+
+    return true;
+}
+
+//---
+
 bool WFuncInfo::load(const std::string &sline, char delimiter)
 {
     std::vector<std::string> args;
@@ -123,6 +138,67 @@ size_t FuncWatchList::loadList(const char* filename)
 
         // Try to parse as a function
         WFuncInfo func_info;
+        if (func_info.load(line, ';')) {
+            appendFunc(func_info);
+        }
+    }
+    return funcs.size();
+}
+
+///---
+
+bool FuncExcludeList::contains(const std::string& dll_name, const std::string& func)
+{
+    for (auto itr = funcs.begin(); itr != funcs.end(); ++itr) {
+        FuncInfo& fInfo = *itr;
+        if (fInfo.funcName == func) {
+            std::cout << "Excluded: " << func << "\n";
+            return true;
+        }
+    }
+    return false;
+}
+
+FuncInfo* FuncExcludeList::findFunc(const std::string& dllName, const std::string& funcName)
+{
+    for (size_t i = 0; i < funcs.size(); i++)
+    {
+        FuncInfo& info = funcs[i];
+        if (util::iequals(info.dllName, dllName)
+            && util::iequals(info.funcName, funcName))
+        {
+            return &info;
+        }
+    }
+    return NULL;
+}
+
+bool FuncExcludeList::appendFunc(FuncInfo& func_info)
+{
+    if (!func_info.isValid()) {
+        return false;
+    }
+    FuncInfo* found = findFunc(func_info.dllName, func_info.funcName);
+    if (!found) {
+        funcs.push_back(func_info);
+    }
+    return true;
+}
+
+size_t FuncExcludeList::loadList(const char* filename)
+{
+    std::ifstream myfile(filename);
+    if (!myfile.is_open()) {
+        std::cerr << "Coud not open file: " << filename << std::endl;
+        return 0;
+    }
+    const size_t MAX_LINE = 300;
+    char line[MAX_LINE] = { 0 };
+    while (!myfile.eof()) {
+        myfile.getline(line, MAX_LINE);
+
+        // Try to parse as a function
+        FuncInfo func_info;
         if (func_info.load(line, ';')) {
             appendFunc(func_info);
         }
