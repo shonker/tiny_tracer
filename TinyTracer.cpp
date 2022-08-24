@@ -183,13 +183,13 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo, BOOL isIndir
     const bool isCallerPeModule = IMG_Valid(callerModule);
     const bool isTargetPeModule = IMG_Valid(targetModule);
 
-
     const std::string func = get_func_at(addrTo);
+    const std::string dll_name = isTargetPeModule ? IMG_Name(targetModule) : "";
 
     if (!g_Excluded.isEmpty()) {
         // check if the current function is excluded:
 
-        if (g_Excluded.contains("", func)) {
+        if (g_Excluded.contains(dll_name, func)) {
             // this function is excluded from the monitoring
             return;
         }
@@ -203,7 +203,6 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo, BOOL isIndir
     {
         ADDRINT RvaFrom = addr_to_rva(addrFrom);
         if (isTargetPeModule) {
-            const std::string dll_name = IMG_Name(targetModule);
             traceLog.logCall(0, RvaFrom, true, dll_name, func);
         }
         else {
@@ -223,7 +222,6 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo, BOOL isIndir
         const ADDRINT pageTo = query_region_base(addrTo);
 
         if (isTargetPeModule) { // it is a call to a module
-            const std::string dll_name = IMG_Name(targetModule);
             traceLog.logCall(pageFrom, addrFrom, false, dll_name, func);
         }
         else if (pageFrom != pageTo) // it is a call to another shellcode
@@ -259,7 +257,7 @@ VOID _SaveTransitions(const ADDRINT addrFrom, const ADDRINT addrTo, BOOL isIndir
             const ADDRINT pageRet = get_base(returnAddr);
             const ADDRINT RvaFrom = addr_to_rva(addrFrom);
             const ADDRINT base = isTargetMy ? 0 : get_base(addrFrom);
-            const std::string dll_name = IMG_Name(targetModule);
+
             traceLog.logCallRet(base, RvaFrom, pageRet, returnAddr, dll_name, func);
         }
     }

@@ -149,11 +149,14 @@ size_t FuncWatchList::loadList(const char* filename)
 
 bool FuncExcludeList::contains(const std::string& dll_name, const std::string& func)
 {
+    const std::string shortDll = util::getDllName(dll_name);
     for (auto itr = funcs.begin(); itr != funcs.end(); ++itr) {
         FuncInfo& fInfo = *itr;
-        if (fInfo.funcName == func) {
-            std::cout << "Excluded: " << func << "\n";
-            return true;
+        if (util::iequals(fInfo.dllName, shortDll)) {
+            if (fInfo.funcName == func) {
+                std::cout << "Excluded: " << shortDll  << "." << func << "\n";
+                return true;
+            }
         }
     }
     return false;
