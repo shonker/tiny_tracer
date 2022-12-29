@@ -17,6 +17,7 @@
 #define SLEEP_TIME                      "SLEEP_TIME"
 #define HOOK_SLEEP                      "HOOK_SLEEP"
 #define LOG_INDIRECT                    "LOG_INDIRECT_CALLS"
+#define HIDE                            "HIDE"
 
 t_shellc_options ConvertShcOption(int value)
 {
@@ -97,6 +98,10 @@ bool fillSettings(Settings &s, std::string line)
         s.sleepTime = util::loadInt(valStr);
         isFilled = true;
     }
+    if (util::iequals(valName, HIDE)) {
+        s.hide = loadBoolean(valStr, s.hide);
+        isFilled = true;
+    }
     return isFilled;
 }
 
@@ -125,6 +130,7 @@ bool Settings::saveINI(const std::string filename)
     myfile << HOOK_SLEEP << DELIM << this->hookSleep << "\r\n";
     myfile << SLEEP_TIME << DELIM << this->sleepTime << "\r\n";
     myfile << LOG_INDIRECT << DELIM << this->logIndirect << "\r\n";
+    myfile << HIDE << DELIM << this->hide << "\r\n";
     myfile.close();
     return true;
 }

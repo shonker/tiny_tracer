@@ -24,6 +24,8 @@
 
 #include "Util.h"
 #include "Settings.h"
+#include "Anti.h"
+
 
 /* ================================================================== */
 // Global variables 
@@ -776,6 +778,15 @@ int main(int argc, char *argv[])
     }
     std::cerr << "===============================================" << std::endl;
 
+    if (m_Settings.hide) {
+        int cleared = 0;
+#ifdef _WIN32
+        cleared = clearFlags();
+#endif
+        if (cleared) {
+            std::cout << "Flags cleared: " << cleared << "\n";
+        }
+    }
     // Start the program, never returns
     PIN_StartProgram();
     return 0;

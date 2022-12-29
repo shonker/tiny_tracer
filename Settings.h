@@ -23,7 +23,8 @@ public:
         logShelcTrans(true),
         shortLogging(true),
         logIndirect(false),
-        hexdumpSize(8)
+        hexdumpSize(8),
+        hide(false)
     {
     }
 
@@ -41,4 +42,5 @@ public:
     size_t hexdumpSize;
     bool hookSleep;
     size_t sleepTime;
+    bool hide;
 };
