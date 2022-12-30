@@ -109,6 +109,20 @@ void TraceLog::logRdtsc(const ADDRINT base, const ADDRINT rva)
     m_traceFile.flush();
 }
 
+void TraceLog::logInstruction(const ADDRINT base, const ADDRINT rva, const std::string& mnem)
+{
+    if (!createFile()) return;
+    if (base) {
+        m_traceFile << "> " << std::hex << base << "+";
+    }
+    m_traceFile
+        << std::hex << rva
+        << DELIMITER
+        << mnem
+        << std::endl;
+    m_traceFile.flush();
+}
+
 void TraceLog::logCpuid(const ADDRINT base, const ADDRINT rva, const ADDRINT param)
 {
     if (!createFile()) return;
